@@ -15,8 +15,10 @@ function OrderStatus({ orders, onUpdateOrderStatus }) {
   };
 
   const getItemDisplayName = (item) => {
-    const optionsText = item.options && item.options.length > 0
-      ? ` (${item.options.map(opt => opt.optionName || opt.name).join(', ')})`
+    // options 또는 selectedOptions 모두 지원 (데이터 구조 호환성)
+    const itemOptions = item.options || item.selectedOptions || [];
+    const optionsText = itemOptions.length > 0
+      ? ` (${itemOptions.map(opt => opt.optionName || opt.name).join(', ')})`
       : '';
     return `${item.productName}${optionsText}`;
   };
@@ -73,7 +75,7 @@ function OrderStatus({ orders, onUpdateOrderStatus }) {
               </div>
               <div className="order-items">
                 {order.items.map((item, index) => (
-                  <div key={index} className="order-item-detail">
+                  <div key={`${order.orderId}-${item.productId}-${index}`} className="order-item-detail">
                     {getItemDisplayName(item)} X {item.quantity}
                   </div>
                 ))}

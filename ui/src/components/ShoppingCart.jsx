@@ -29,7 +29,7 @@ function ShoppingCart({ cartItems, onOrder }) {
           <div className="cart-items-section">
             <div className="cart-items">
               {cartItems.map((item, index) => (
-                <div key={index} className="cart-item">
+                <div key={`${item.productId}-${item.selectedOptions.map(opt => opt.optionId).join('-')}-${index}`} className="cart-item">
                   <span className="item-name">
                     {getItemDisplayName(item)} X {item.quantity}
                   </span>

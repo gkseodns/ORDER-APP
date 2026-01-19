@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import Navigation from './components/Navigation';
 import ProductCard from './components/ProductCard';
 import ShoppingCart from './components/ShoppingCart';
@@ -89,10 +89,18 @@ function App() {
     { productId: 5, productName: '바닐라라떼', stock: 10 },
     { productId: 6, productName: '카라멜마키아토', stock: 10 }
   ]);
+  // 재고 차감 처리된 주문 추적 (중복 차감 방지)
+  const processedOrdersRef = useRef(new Set());
 
   // 대시보드 통계 계산
   // 총 수량: 제조완료되지 않은 주문의 커피 주문 수량 (아이템 총 개수)
   // 주문 접수: 주문접수 상태인 주문 건수
+  // 제조완료: 제조완료된 주문의 커피 수량 / 제조완료된 주문 건수
+  const completedOrders = orders.filter(o => o.status === '제조완료');
+  const completedQuantity = completedOrders.reduce((sum, order) => {
+    return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
+  }, 0);
+  
   const dashboardStats = {
     totalOrders: orders
       .filter(o => o.status !== '제조완료') // 제조완료된 주문 제외
@@ -101,7 +109,27 @@ function App() {
       }, 0), // 제조완료되지 않은 주문의 아이템 수량 합계
     receivedOrders: orders.filter(o => o.status === '주문접수').length, // 주문접수 상태인 주문 건수
     inProgressOrders: orders.filter(o => o.status === '제조중').length,
-    completedOrders: orders.filter(o => o.status === '제조완료').length
+    completedOrders: `${completedQuantity} / ${completedOrders.length}` // 제조완료 커피 수량 / 제조완료 주문 건수
+  };
+
+  // 주문 진행중인 수량 계산 (주문접수 + 제조중 상태의 주문들)
+  const inProgressOrders = orders.filter(o => o.status === '주문접수' || o.status === '제조중');
+  const inProgressQuantities = inProgressOrders.reduce((acc, order) => {
+    order.items.forEach(item => {
+      if (!acc[item.productId]) {
+        acc[item.productId] = 0;
+      }
+      acc[item.productId] += item.quantity;
+    });
+    return acc;
+  }, {});
+
+  // 각 상품의 주문 가능 수량 계산 (재고 수량 - 주문 진행중 수량)
+  const getAvailableStock = (productId) => {
+    const inventoryItem = inventory.find(inv => inv.productId === productId);
+    const currentStock = inventoryItem ? inventoryItem.stock : 0;
+    const inProgressQty = inProgressQuantities[productId] || 0;
+    return Math.max(0, currentStock - inProgressQty);
   };
 
   const handleNavigate = (page) => {
@@ -110,6 +138,21 @@ function App() {
 
   const handleAddToCart = (item) => {
     setCartItems(prev => {
+      // 현재 장바구니에 담긴 해당 상품의 총 수량 계산 (옵션 무관)
+      const cartQuantityForProduct = prev
+        .filter(cartItem => cartItem.productId === item.productId)
+        .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+      
+      // 주문 가능 수량 계산 (재고 - 주문 진행중 수량 - 장바구니에 담긴 수량)
+      const availableStock = getAvailableStock(item.productId);
+      const remainingStock = availableStock - cartQuantityForProduct;
+      
+      // 주문 가능 수량 초과 시 알림 표시하고 추가하지 않음
+      if (remainingStock <= 0) {
+        alert(`주문 가능 수량을 초과했습니다.\n${item.productName}의 주문 가능 수량: ${availableStock}개`);
+        return prev; // 변경 없이 반환
+      }
+      
       // 동일한 제품+옵션 조합이 있는지 확인
       const existingIndex = prev.findIndex(cartItem => {
         if (cartItem.productId !== item.productId) return false;
@@ -140,20 +183,24 @@ function App() {
   const handleOrder = () => {
     if (cartItems.length === 0) return;
     
-    // 주문 데이터 생성
+    // 주문 데이터 생성 (장바구니 아이템을 그대로 사용)
     const orderData = {
       orderId: Date.now(), // 간단한 ID 생성
       items: cartItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
         options: item.selectedOptions,
-        quantity: item.quantity,
+        quantity: item.quantity, // 장바구니의 quantity를 그대로 사용
         price: item.totalPrice
       })),
       totalAmount: cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
       orderDate: new Date().toISOString(),
       status: '주문접수'
     };
+
+    // 디버깅: 주문 데이터 확인
+    console.log('주문 데이터:', JSON.stringify(orderData, null, 2));
+    console.log('주문 아이템들:', orderData.items.map(item => `${item.productName} X ${item.quantity}`));
 
     // 주문 목록에 추가
     setOrders(prev => [orderData, ...prev]);
@@ -175,25 +222,68 @@ function App() {
   };
 
   const handleUpdateOrderStatus = (orderId, newStatus) => {
+    // 주문 상태 업데이트
     setOrders(prev => {
       const orderToUpdate = prev.find(order => order.orderId === orderId);
       
       // 제조완료로 변경될 때만 재고 차감
       if (newStatus === '제조완료' && orderToUpdate && orderToUpdate.status !== '제조완료') {
-        // 주문의 각 아이템마다 해당 상품의 재고를 개별적으로 차감
-        orderToUpdate.items.forEach(orderItem => {
-          setInventory(currentInventory => 
-            currentInventory.map(invItem => {
-              // 각 상품의 productId가 일치하는 경우에만 해당 주문 아이템의 수량만큼 차감
-              if (invItem.productId === orderItem.productId) {
-                return {
-                  ...invItem,
-                  stock: Math.max(0, invItem.stock - orderItem.quantity)
-                };
-              }
-              return invItem;
-            })
+        // 이미 처리된 주문인지 확인 (중복 차감 방지)
+        if (processedOrdersRef.current.has(orderId)) {
+          console.warn(`주문 ${orderId}는 이미 처리되었습니다. 재고 차감을 건너뜁니다.`);
+          return prev.map(order =>
+            order.orderId === orderId
+              ? { ...order, status: newStatus }
+              : order
           );
+        }
+        
+        // 처리된 주문으로 표시
+        processedOrdersRef.current.add(orderId);
+        
+        // 주문 아이템 데이터를 복사 (참조 문제 방지)
+        const orderItems = JSON.parse(JSON.stringify(orderToUpdate.items));
+        
+        // 디버깅: 재고 차감 전 데이터 확인
+        console.log('=== 재고 차감 시작 ===');
+        console.log('주문 ID:', orderId);
+        console.log('주문 아이템들:', orderItems.map(item => `${item.productName} (ID: ${item.productId}) X ${item.quantity}`));
+        
+        // 재고 차감 처리 (setOrders 밖에서 처리)
+        setInventory(currentInventory => {
+          // 재고 맵 생성 (깊은 복사)
+          const inventoryMap = new Map();
+          currentInventory.forEach(item => {
+            inventoryMap.set(item.productId, { ...item });
+          });
+          
+          // 디버깅: 재고 차감 전 재고 상태
+          console.log('재고 차감 전:', Array.from(inventoryMap.values()).map(item => `${item.productName} (ID: ${item.productId}): ${item.stock}개`));
+          
+          // 주문의 각 아이템을 순회하면서 해당 상품의 재고 차감
+          orderItems.forEach((orderItem, index) => {
+            const invItem = inventoryMap.get(orderItem.productId);
+            if (invItem && orderItem.quantity > 0) {
+              // 해당 주문 아이템의 수량만큼만 재고 차감
+              const currentStock = invItem.stock;
+              const deductAmount = orderItem.quantity;
+              const newStock = Math.max(0, currentStock - deductAmount);
+              console.log(`[${index + 1}] ${orderItem.productName} (ID: ${orderItem.productId}): ${currentStock}개 - ${deductAmount}개 = ${newStock}개`);
+              inventoryMap.set(orderItem.productId, {
+                ...invItem,
+                stock: newStock
+              });
+            } else {
+              console.warn(`재고를 찾을 수 없거나 수량이 0입니다: ${orderItem.productName} (ID: ${orderItem.productId})`);
+            }
+          });
+          
+          // 디버깅: 재고 차감 후 재고 상태
+          console.log('재고 차감 후:', Array.from(inventoryMap.values()).map(item => `${item.productName} (ID: ${item.productId}): ${item.stock}개`));
+          console.log('=== 재고 차감 완료 ===');
+          
+          // 맵을 배열로 변환
+          return Array.from(inventoryMap.values());
         });
       }
       
@@ -213,13 +303,24 @@ function App() {
           <div className="products-section">
             <h1 className="section-title">메뉴</h1>
             <div className="products-grid">
-              {coffeeProducts.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                />
-              ))}
+              {coffeeProducts.map(product => {
+                // 주문 가능 수량 = 재고 수량 - 주문 진행중 수량
+                const availableStock = getAvailableStock(product.id);
+                // 장바구니에 담긴 해당 상품의 총 수량 계산 (옵션 무관)
+                const cartQuantityForProduct = cartItems
+                  .filter(cartItem => cartItem.productId === product.id)
+                  .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+                // 실제 주문 가능 수량 = 주문 가능 수량 - 장바구니에 담긴 수량
+                const remainingStock = Math.max(0, availableStock - cartQuantityForProduct);
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    stock={remainingStock}
+                    onAddToCart={handleAddToCart}
+                  />
+                );
+              })}
             </div>
           </div>
           <ShoppingCart cartItems={cartItems} onOrder={handleOrder} />

@@ -59,6 +59,12 @@
   color: #333;
 }
 
+.out-of-stock-label {
+  color: #C62828;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 .product-price {
   margin: 0;
   font-size: 1.2rem;
@@ -113,4 +119,14 @@
 
 .add-to-cart-button:active {
   background-color: #1565C0;
+}
+
+.add-to-cart-button:disabled {
+  background-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.add-to-cart-button:disabled:hover {
+  background-color: #ccc;
 }

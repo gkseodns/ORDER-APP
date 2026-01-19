@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import './ProductCard.css';
 
-function ProductCard({ product, onAddToCart }) {
+function ProductCard({ product, stock = 0, onAddToCart }) {
   const [selectedOptions, setSelectedOptions] = useState([]);
+  const isOutOfStock = stock === 0;
+  const isProcessingRef = useRef(false); // 중복 클릭 방지
 
   const handleOptionChange = (optionId) => {
     setSelectedOptions(prev => {
@@ -22,7 +24,14 @@ function ProductCard({ product, onAddToCart }) {
     return basePrice + optionsPrice;
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCartClick = (e) => {
+    // 중복 클릭 방지
+    if (isProcessingRef.current) {
+      return;
+    }
+    
+    isProcessingRef.current = true;
+    
     const selectedOptionsData = product.options.filter(option => 
       selectedOptions.includes(option.id)
     );
@@ -42,6 +51,11 @@ function ProductCard({ product, onAddToCart }) {
 
     // 옵션 초기화
     setSelectedOptions([]);
+    
+    // 짧은 딜레이 후 다시 클릭 가능하도록 설정
+    setTimeout(() => {
+      isProcessingRef.current = false;
+    }, 300);
   };
 
   const formatPrice = (price) => {
@@ -58,7 +72,10 @@ function ProductCard({ product, onAddToCart }) {
         )}
       </div>
       <div className="product-info">
-        <h3 className="product-name">{product.name}</h3>
+        <h3 className="product-name">
+          {product.name}
+          {isOutOfStock && <span className="out-of-stock-label"> (품절)</span>}
+        </h3>
         <p className="product-price">{formatPrice(calculatePrice())}</p>
         <p className="product-description">{product.description}</p>
         <div className="product-options">
@@ -68,6 +85,7 @@ function ProductCard({ product, onAddToCart }) {
                 type="checkbox"
                 checked={selectedOptions.includes(option.id)}
                 onChange={() => handleOptionChange(option.id)}
+                disabled={isOutOfStock}
               />
               <span>
                 {option.name}
@@ -77,8 +95,12 @@ function ProductCard({ product, onAddToCart }) {
             </label>
           ))}
         </div>
-        <button className="add-to-cart-button" onClick={handleAddToCart}>
-          담기
+        <button 
+          className="add-to-cart-button" 
+          onClick={handleAddToCartClick}
+          disabled={isOutOfStock}
+        >
+          {isOutOfStock ? '품절' : '담기'}
         </button>
       </div>
     </div>
