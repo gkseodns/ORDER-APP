@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import ProductCard from './components/ProductCard';
 import ShoppingCart from './components/ShoppingCart';
+import AdminDashboard from './components/AdminDashboard';
+import InventoryStatus from './components/InventoryStatus';
+import OrderStatus from './components/OrderStatus';
 import './App.css';
 
 // 임시 커피 메뉴 데이터
@@ -77,13 +80,32 @@ const coffeeProducts = [
 function App() {
   const [currentPage, setCurrentPage] = useState('order');
   const [cartItems, setCartItems] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [inventory, setInventory] = useState([
+    { productId: 1, productName: '아메리카노(ICE)', stock: 10 },
+    { productId: 2, productName: '아메리카노(HOT)', stock: 10 },
+    { productId: 3, productName: '카페라떼', stock: 10 },
+    { productId: 4, productName: '카푸치노', stock: 10 },
+    { productId: 5, productName: '바닐라라떼', stock: 10 },
+    { productId: 6, productName: '카라멜마키아토', stock: 10 }
+  ]);
+
+  // 대시보드 통계 계산
+  // 총 수량: 제조완료되지 않은 주문의 커피 주문 수량 (아이템 총 개수)
+  // 주문 접수: 주문접수 상태인 주문 건수
+  const dashboardStats = {
+    totalOrders: orders
+      .filter(o => o.status !== '제조완료') // 제조완료된 주문 제외
+      .reduce((sum, order) => {
+        return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
+      }, 0), // 제조완료되지 않은 주문의 아이템 수량 합계
+    receivedOrders: orders.filter(o => o.status === '주문접수').length, // 주문접수 상태인 주문 건수
+    inProgressOrders: orders.filter(o => o.status === '제조중').length,
+    completedOrders: orders.filter(o => o.status === '제조완료').length
+  };
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
-    // 관리자 페이지는 나중에 구현
-    if (page === 'admin') {
-      alert('관리자 페이지는 준비 중입니다.');
-    }
   };
 
   const handleAddToCart = (item) => {
@@ -120,6 +142,7 @@ function App() {
     
     // 주문 데이터 생성
     const orderData = {
+      orderId: Date.now(), // 간단한 ID 생성
       items: cartItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
@@ -128,14 +151,58 @@ function App() {
         price: item.totalPrice
       })),
       totalAmount: cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
-      orderDate: new Date().toISOString()
+      orderDate: new Date().toISOString(),
+      status: '주문접수'
     };
 
-    console.log('주문 데이터:', orderData);
+    // 주문 목록에 추가
+    setOrders(prev => [orderData, ...prev]);
+    
     alert(`주문이 완료되었습니다!\n총 금액: ${orderData.totalAmount.toLocaleString('ko-KR')}원`);
     
     // 장바구니 초기화
     setCartItems([]);
+  };
+
+  const handleUpdateStock = (productId, change) => {
+    setInventory(prev => 
+      prev.map(item => 
+        item.productId === productId
+          ? { ...item, stock: Math.max(0, item.stock + change) }
+          : item
+      )
+    );
+  };
+
+  const handleUpdateOrderStatus = (orderId, newStatus) => {
+    setOrders(prev => {
+      const orderToUpdate = prev.find(order => order.orderId === orderId);
+      
+      // 제조완료로 변경될 때만 재고 차감
+      if (newStatus === '제조완료' && orderToUpdate && orderToUpdate.status !== '제조완료') {
+        // 주문의 각 아이템마다 해당 상품의 재고를 개별적으로 차감
+        orderToUpdate.items.forEach(orderItem => {
+          setInventory(currentInventory => 
+            currentInventory.map(invItem => {
+              // 각 상품의 productId가 일치하는 경우에만 해당 주문 아이템의 수량만큼 차감
+              if (invItem.productId === orderItem.productId) {
+                return {
+                  ...invItem,
+                  stock: Math.max(0, invItem.stock - orderItem.quantity)
+                };
+              }
+              return invItem;
+            })
+          );
+        });
+      }
+      
+      return prev.map(order =>
+        order.orderId === orderId
+          ? { ...order, status: newStatus }
+          : order
+      );
+    });
   };
 
   if (currentPage === 'order') {
@@ -161,14 +228,26 @@ function App() {
     );
   }
 
-  return (
-    <div className="app">
-      <Navigation currentPage={currentPage} onNavigate={handleNavigate} />
-      <main className="main-content">
-        <p>관리자 페이지는 준비 중입니다.</p>
-      </main>
-    </div>
-  );
+  if (currentPage === 'admin') {
+    return (
+      <div className="app">
+        <Navigation currentPage={currentPage} onNavigate={handleNavigate} />
+        <main className="main-content">
+          <AdminDashboard stats={dashboardStats} />
+          <InventoryStatus 
+            inventory={inventory} 
+            onUpdateStock={handleUpdateStock}
+          />
+          <OrderStatus 
+            orders={orders.filter(o => o.status !== '제조완료')} 
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default App;
