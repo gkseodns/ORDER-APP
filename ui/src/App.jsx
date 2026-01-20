@@ -1,116 +1,71 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import ProductCard from './components/ProductCard';
 import ShoppingCart from './components/ShoppingCart';
 import AdminDashboard from './components/AdminDashboard';
 import InventoryStatus from './components/InventoryStatus';
 import OrderStatus from './components/OrderStatus';
+import { menusAPI, ordersAPI, inventoryAPI, statsAPI } from './api/client';
 import './App.css';
-
-// 임시 커피 메뉴 데이터
-const coffeeProducts = [
-  {
-    id: 1,
-    name: '아메리카노(ICE)',
-    price: 4000,
-    description: '시원하고 깔끔한 아이스 아메리카노',
-    imageUrl: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=400&h=400&fit=crop&q=80',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 2,
-    name: '아메리카노(HOT)',
-    price: 4000,
-    description: '따뜻하고 진한 핫 아메리카노',
-    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&h=400&fit=crop',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 3,
-    name: '카페라떼',
-    price: 5000,
-    description: '부드럽고 고소한 카페라떼',
-    imageUrl: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&h=400&fit=crop&q=80',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 4,
-    name: '카푸치노',
-    price: 5000,
-    description: '우유 거품이 풍부한 카푸치노',
-    imageUrl: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&h=400&fit=crop',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 5,
-    name: '바닐라라떼',
-    price: 5500,
-    description: '달콤한 바닐라 시럽이 들어간 라떼',
-    imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=400&fit=crop&q=80',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 6,
-    name: '카라멜마키아토',
-    price: 6000,
-    description: '카라멜 시럽과 거품이 어우러진 마키아토',
-    imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=400&fit=crop',
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  }
-];
 
 function App() {
   const [currentPage, setCurrentPage] = useState('order');
   const [cartItems, setCartItems] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [inventory, setInventory] = useState([
-    { productId: 1, productName: '아메리카노(ICE)', stock: 10 },
-    { productId: 2, productName: '아메리카노(HOT)', stock: 10 },
-    { productId: 3, productName: '카페라떼', stock: 10 },
-    { productId: 4, productName: '카푸치노', stock: 10 },
-    { productId: 5, productName: '바닐라라떼', stock: 10 },
-    { productId: 6, productName: '카라멜마키아토', stock: 10 }
-  ]);
-  // 재고 차감 처리된 주문 추적 (중복 차감 방지)
-  const processedOrdersRef = useRef(new Set());
+  const [inventory, setInventory] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalOrders: 0,
+    receivedOrders: 0,
+    inProgressOrders: 0,
+    completedOrders: '0 / 0'
+  });
+  const [loading, setLoading] = useState(true);
 
-  // 대시보드 통계 계산
-  // 총 수량: 제조완료되지 않은 주문의 커피 주문 수량 (아이템 총 개수)
-  // 주문 접수: 주문접수 상태인 주문 건수
-  // 제조완료: 제조완료된 주문의 커피 수량 / 제조완료된 주문 건수
-  const completedOrders = orders.filter(o => o.status === '제조완료');
-  const completedQuantity = completedOrders.reduce((sum, order) => {
-    return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
-  }, 0);
-  
-  const dashboardStats = {
-    totalOrders: orders
-      .filter(o => o.status !== '제조완료') // 제조완료된 주문 제외
-      .reduce((sum, order) => {
-        return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
-      }, 0), // 제조완료되지 않은 주문의 아이템 수량 합계
-    receivedOrders: orders.filter(o => o.status === '주문접수').length, // 주문접수 상태인 주문 건수
-    inProgressOrders: orders.filter(o => o.status === '제조중').length,
-    completedOrders: `${completedQuantity} / ${completedOrders.length}` // 제조완료 커피 수량 / 제조완료 주문 건수
+  // 데이터 로드 함수
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // 메뉴 데이터 로드
+      const productsData = await menusAPI.getAll();
+      setProducts(productsData.map(product => ({
+        ...product,
+        imageUrl: product.imageUrl || ''
+      })));
+      
+      // 재고 데이터 로드
+      const inventoryData = await inventoryAPI.getAll();
+      setInventory(inventoryData);
+      
+      // 주문 데이터 로드 (제조완료 제외)
+      const ordersData = await ordersAPI.getAll({ excludeCompleted: 'true' });
+      setOrders(ordersData);
+      
+      // 대시보드 통계 로드
+      const statsData = await statsAPI.getDashboard();
+      setDashboardStats(statsData);
+    } catch (error) {
+      console.error('데이터 로드 오류:', error);
+      alert('데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // 컴포넌트 마운트 시 데이터 로드
+  useEffect(() => {
+    loadData();
+    
+    // 관리자 페이지일 때 주기적으로 데이터 갱신 (30초마다)
+    if (currentPage === 'admin') {
+      const interval = setInterval(() => {
+        loadData();
+      }, 30000); // 30초마다 갱신
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentPage]);
 
   // 주문 진행중인 수량 계산 (주문접수 + 제조중 상태의 주문들)
   const inProgressOrders = orders.filter(o => o.status === '주문접수' || o.status === '제조중');
@@ -180,120 +135,103 @@ function App() {
     });
   };
 
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (cartItems.length === 0) return;
     
-    // 주문 데이터 생성 (장바구니 아이템을 그대로 사용)
-    const orderData = {
-      orderId: Date.now(), // 간단한 ID 생성
-      items: cartItems.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        options: item.selectedOptions,
-        quantity: item.quantity, // 장바구니의 quantity를 그대로 사용
-        price: item.totalPrice
-      })),
-      totalAmount: cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
-      orderDate: new Date().toISOString(),
-      status: '주문접수'
-    };
+    try {
+      // 주문 데이터 생성 (장바구니 아이템을 그대로 사용)
+      const orderData = {
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          options: item.selectedOptions.map(opt => ({
+            optionId: opt.optionId,
+            optionName: opt.optionName,
+            optionPrice: opt.optionPrice
+          })),
+          quantity: item.quantity,
+          price: item.totalPrice
+        })),
+        totalAmount: cartItems.reduce((sum, item) => sum + item.totalPrice, 0)
+      };
 
-    // 디버깅: 주문 데이터 확인
-    console.log('주문 데이터:', JSON.stringify(orderData, null, 2));
-    console.log('주문 아이템들:', orderData.items.map(item => `${item.productName} X ${item.quantity}`));
-
-    // 주문 목록에 추가
-    setOrders(prev => [orderData, ...prev]);
-    
-    alert(`주문이 완료되었습니다!\n총 금액: ${orderData.totalAmount.toLocaleString('ko-KR')}원`);
-    
-    // 장바구니 초기화
-    setCartItems([]);
-  };
-
-  const handleUpdateStock = (productId, change) => {
-    setInventory(prev => 
-      prev.map(item => 
-        item.productId === productId
-          ? { ...item, stock: Math.max(0, item.stock + change) }
-          : item
-      )
-    );
-  };
-
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    // 주문 상태 업데이트
-    setOrders(prev => {
-      const orderToUpdate = prev.find(order => order.orderId === orderId);
+      // API로 주문 생성
+      const createdOrder = await ordersAPI.create(orderData);
       
-      // 제조완료로 변경될 때만 재고 차감
-      if (newStatus === '제조완료' && orderToUpdate && orderToUpdate.status !== '제조완료') {
-        // 이미 처리된 주문인지 확인 (중복 차감 방지)
-        if (processedOrdersRef.current.has(orderId)) {
-          console.warn(`주문 ${orderId}는 이미 처리되었습니다. 재고 차감을 건너뜁니다.`);
-          return prev.map(order =>
-            order.orderId === orderId
-              ? { ...order, status: newStatus }
-              : order
-          );
-        }
-        
-        // 처리된 주문으로 표시
-        processedOrdersRef.current.add(orderId);
-        
-        // 주문 아이템 데이터를 복사 (참조 문제 방지)
-        const orderItems = JSON.parse(JSON.stringify(orderToUpdate.items));
-        
-        // 디버깅: 재고 차감 전 데이터 확인
-        console.log('=== 재고 차감 시작 ===');
-        console.log('주문 ID:', orderId);
-        console.log('주문 아이템들:', orderItems.map(item => `${item.productName} (ID: ${item.productId}) X ${item.quantity}`));
-        
-        // 재고 차감 처리 (setOrders 밖에서 처리)
-        setInventory(currentInventory => {
-          // 재고 맵 생성 (깊은 복사)
-          const inventoryMap = new Map();
-          currentInventory.forEach(item => {
-            inventoryMap.set(item.productId, { ...item });
-          });
-          
-          // 디버깅: 재고 차감 전 재고 상태
-          console.log('재고 차감 전:', Array.from(inventoryMap.values()).map(item => `${item.productName} (ID: ${item.productId}): ${item.stock}개`));
-          
-          // 주문의 각 아이템을 순회하면서 해당 상품의 재고 차감
-          orderItems.forEach((orderItem, index) => {
-            const invItem = inventoryMap.get(orderItem.productId);
-            if (invItem && orderItem.quantity > 0) {
-              // 해당 주문 아이템의 수량만큼만 재고 차감
-              const currentStock = invItem.stock;
-              const deductAmount = orderItem.quantity;
-              const newStock = Math.max(0, currentStock - deductAmount);
-              console.log(`[${index + 1}] ${orderItem.productName} (ID: ${orderItem.productId}): ${currentStock}개 - ${deductAmount}개 = ${newStock}개`);
-              inventoryMap.set(orderItem.productId, {
-                ...invItem,
-                stock: newStock
-              });
-            } else {
-              console.warn(`재고를 찾을 수 없거나 수량이 0입니다: ${orderItem.productName} (ID: ${orderItem.productId})`);
-            }
-          });
-          
-          // 디버깅: 재고 차감 후 재고 상태
-          console.log('재고 차감 후:', Array.from(inventoryMap.values()).map(item => `${item.productName} (ID: ${item.productId}): ${item.stock}개`));
-          console.log('=== 재고 차감 완료 ===');
-          
-          // 맵을 배열로 변환
-          return Array.from(inventoryMap.values());
-        });
+      alert(`주문이 완료되었습니다!\n총 금액: ${orderData.totalAmount.toLocaleString('ko-KR')}원`);
+      
+      // 장바구니 초기화
+      setCartItems([]);
+      
+      // 주문 목록 새로고침
+      if (currentPage === 'admin') {
+        await loadData();
       }
-      
-      return prev.map(order =>
-        order.orderId === orderId
-          ? { ...order, status: newStatus }
-          : order
-      );
-    });
+    } catch (error) {
+      console.error('주문 생성 오류:', error);
+      alert(`주문 생성 중 오류가 발생했습니다: ${error.message}`);
+    }
   };
+
+  const handleUpdateStock = async (productId, change) => {
+    try {
+      // API로 재고 업데이트
+      const updated = await inventoryAPI.update(productId, change);
+      
+      // 로컬 상태 업데이트
+      setInventory(prev => 
+        prev.map(item => 
+          item.productId === productId
+            ? { ...item, stock: updated.stock }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error('재고 업데이트 오류:', error);
+      alert(`재고 업데이트 중 오류가 발생했습니다: ${error.message}`);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      // API로 주문 상태 업데이트
+      const updatedOrder = await ordersAPI.updateStatus(orderId, newStatus);
+      
+      // 로컬 상태 업데이트
+      setOrders(prev => 
+        prev.map(order =>
+          order.id === orderId || order.orderId === orderId
+            ? { ...order, ...updatedOrder, orderId: updatedOrder.id }
+            : order
+        )
+      );
+      
+      // 제조완료로 변경된 경우 재고 및 통계 새로고침
+      if (newStatus === '제조완료') {
+        await loadData();
+      } else {
+        // 대시보드 통계만 새로고침
+        const statsData = await statsAPI.getDashboard();
+        setDashboardStats(statsData);
+      }
+    } catch (error) {
+      console.error('주문 상태 업데이트 오류:', error);
+      alert(`주문 상태 변경 중 오류가 발생했습니다: ${error.message}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="app">
+        <Navigation currentPage={currentPage} onNavigate={handleNavigate} />
+        <main className="main-content">
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <p>데이터를 불러오는 중...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (currentPage === 'order') {
     return (
@@ -303,7 +241,7 @@ function App() {
           <div className="products-section">
             <h1 className="section-title">메뉴</h1>
             <div className="products-grid">
-              {coffeeProducts.map(product => {
+              {products.map(product => {
                 // 주문 가능 수량 = 재고 수량 - 주문 진행중 수량
                 const availableStock = getAvailableStock(product.id);
                 // 장바구니에 담긴 해당 상품의 총 수량 계산 (옵션 무관)

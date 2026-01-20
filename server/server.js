@@ -1,6 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import { initializePool, serverConfig, testConnection } from './configure.js';
+import menusRouter from './routes/menus.js';
+import ordersRouter from './routes/orders.js';
+import inventoryRouter from './routes/inventory.js';
+import statsRouter from './routes/stats.js';
 
 const app = express();
 const PORT = serverConfig.port;
@@ -29,6 +33,12 @@ app.get('/api/health', async (req, res) => {
     database: dbConnected ? 'connected' : 'disconnected'
   });
 });
+
+// API 라우트
+app.use('/api/menus', menusRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/inventory', inventoryRouter);
+app.use('/api/stats', statsRouter);
 
 // 404 핸들러
 app.use((req, res) => {

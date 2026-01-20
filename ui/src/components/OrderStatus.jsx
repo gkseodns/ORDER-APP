@@ -28,20 +28,31 @@ function OrderStatus({ orders, onUpdateOrderStatus }) {
   };
 
   const getStatusButton = (order) => {
-    if (order.status === '주문접수') {
+    const orderId = order.id || order.orderId; // id와 orderId 모두 지원
+    
+    if (order.status === '대기') {
       return (
         <button
           className="status-button receive"
-          onClick={() => handleStatusChange(order.orderId, '제조중')}
+          onClick={() => handleStatusChange(orderId, '주문접수')}
         >
-          제조 시작
+          주문 접수
+        </button>
+      );
+    } else if (order.status === '주문접수') {
+      return (
+        <button
+          className="status-button in-progress"
+          onClick={() => handleStatusChange(orderId, '제조중')}
+        >
+          제조 중
         </button>
       );
     } else if (order.status === '제조중') {
       return (
         <button
           className="status-button complete"
-          onClick={() => handleStatusChange(order.orderId, '제조완료')}
+          onClick={() => handleStatusChange(orderId, '제조완료')}
         >
           제조 완료
         </button>
@@ -67,7 +78,7 @@ function OrderStatus({ orders, onUpdateOrderStatus }) {
       <h2 className="order-title">주문현황</h2>
       <div className="order-list">
         {orders.map(order => (
-          <div key={order.orderId} className="order-item">
+          <div key={order.id || order.orderId} className="order-item">
             <div className="order-info">
               <div className="order-header">
                 <div className="order-date">{formatDate(order.orderDate)}</div>
@@ -75,7 +86,7 @@ function OrderStatus({ orders, onUpdateOrderStatus }) {
               </div>
               <div className="order-items">
                 {order.items.map((item, index) => (
-                  <div key={`${order.orderId}-${item.productId}-${index}`} className="order-item-detail">
+                  <div key={`${order.id || order.orderId}-${item.productId}-${index}`} className="order-item-detail">
                     {getItemDisplayName(item)} X {item.quantity}
                   </div>
                 ))}
