@@ -1,0 +1,74 @@
+# 의존성
+node_modules/
+package-lock.json
+
+# 환경 변수 파일 (민감한 정보 포함)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# 로그 파일
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log.*
+
+# 운영체제 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE 설정
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# 빌드 파일
+dist/
+build/
+out/
+
+# 캐시 파일
+.cache/
+.npm/
+.yarn/
+.eslintcache
+.parcel-cache
+
+# 테스트 커버리지
+coverage/
+.nyc_output/
+*.lcov
+
+# 임시 파일
+*.tmp
+*.temp
+.temp/
+tmp/
+
+# 데이터베이스 백업 파일 (선택사항)
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# 프로세스 관리
+.pm2/
+*.pid
+*.seed
+*.pid.lock
