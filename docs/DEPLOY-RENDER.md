@@ -48,7 +48,7 @@
 
 4. **Create Web Service**로 배포합니다.
 5. 배포가 끝나면 **백엔드 URL**을 확인합니다.  
-   예: `https://order-app-api.onrender.com`  
+   예: `https://order-app-backend-1c7a.onrender.com`  
    이 URL을 다음 단계에서 프론트엔드 API 주소로 사용합니다.
 
 ---
@@ -67,7 +67,7 @@
 3. **Environment** 탭에서 빌드 시 사용할 변수를 추가합니다.
 
 - `VITE_API_BASE_URL` = 백엔드 URL + `/api`  
-  예: `https://order-app-api.onrender.com/api`
+  예: `https://order-app-backend-1c7a.onrender.com/api`
 
    (프론트는 이 값을 빌드 시점에 `client.js`의 `API_BASE_URL`로 사용합니다.)
 
