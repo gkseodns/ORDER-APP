@@ -197,8 +197,8 @@ function App() {
       // API로 주문 상태 업데이트
       const updatedOrder = await ordersAPI.updateStatus(orderId, newStatus);
       
-      // 로컬 상태 업데이트
-      setOrders(prev => 
+      // 주문 목록: 해당 주문만 상태 반영 (전체 새로고침 없음)
+      setOrders(prev =>
         prev.map(order =>
           order.id === orderId || order.orderId === orderId
             ? { ...order, ...updatedOrder, orderId: updatedOrder.id }
@@ -206,13 +206,14 @@ function App() {
         )
       );
       
-      // 제조완료로 변경된 경우 재고 및 통계 새로고침
+      // 통계만 갱신 (전체 loadData 호출 안 함)
+      const statsData = await statsAPI.getDashboard();
+      setDashboardStats(statsData);
+      
+      // 제조완료인 경우 재고 수량만 추가로 갱신
       if (newStatus === '제조완료') {
-        await loadData();
-      } else {
-        // 대시보드 통계만 새로고침
-        const statsData = await statsAPI.getDashboard();
-        setDashboardStats(statsData);
+        const inventoryData = await inventoryAPI.getAll();
+        setInventory(inventoryData);
       }
     } catch (error) {
       console.error('주문 상태 업데이트 오류:', error);
