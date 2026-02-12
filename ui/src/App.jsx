@@ -5,7 +5,7 @@ import ShoppingCart from './components/ShoppingCart';
 import AdminDashboard from './components/AdminDashboard';
 import InventoryStatus from './components/InventoryStatus';
 import OrderStatus from './components/OrderStatus';
-import { menusAPI, ordersAPI, inventoryAPI, statsAPI } from './api/client';
+import { menusAPI, ordersAPI, inventoryAPI, statsAPI, adminAPI } from './api/client';
 import './App.css';
 
 function App() {
@@ -53,18 +53,29 @@ function App() {
     }
   };
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 관리자 대시보드 부분 갱신 (전체현황·재고현황·주문현황 숫자만, 페이지 새로고침 없음)
+  const refreshAdminData = async () => {
+    try {
+      const { stats, inventory: inv, orders: ord } = await adminAPI.getPartial();
+      setDashboardStats(stats);
+      setInventory(inv);
+      setOrders(ord);
+    } catch (error) {
+      console.error('관리자 부분 갱신 오류:', error);
+    }
+  };
+
+  // 컴포넌트 마운트 시 전체 데이터 로드 (메뉴 포함)
   useEffect(() => {
     loadData();
-    
-    // 관리자 페이지일 때 주기적으로 데이터 갱신 (30초마다)
-    if (currentPage === 'admin') {
-      const interval = setInterval(() => {
-        loadData();
-      }, 30000); // 30초마다 갱신
-      
-      return () => clearInterval(interval);
-    }
+  }, []);
+
+  // 관리자 페이지일 때: 진입 시 1회 + 30초마다 부분 갱신 (전체현황·재고·주문 숫자만)
+  useEffect(() => {
+    if (currentPage !== 'admin') return;
+    refreshAdminData();
+    const interval = setInterval(refreshAdminData, 30000);
+    return () => clearInterval(interval);
   }, [currentPage]);
 
   // 주문 진행중인 수량 계산 (주문접수 + 제조중 상태의 주문들)
@@ -163,9 +174,9 @@ function App() {
       // 장바구니 초기화
       setCartItems([]);
       
-      // 주문 목록 새로고침
+      // 관리자 화면이면 숫자만 부분 갱신
       if (currentPage === 'admin') {
-        await loadData();
+        await refreshAdminData();
       }
     } catch (error) {
       console.error('주문 생성 오류:', error);
@@ -175,17 +186,9 @@ function App() {
 
   const handleUpdateStock = async (productId, change) => {
     try {
-      // API로 재고 업데이트
-      const updated = await inventoryAPI.update(productId, change);
-      
-      // 로컬 상태 업데이트
-      setInventory(prev => 
-        prev.map(item => 
-          item.productId === productId
-            ? { ...item, stock: updated.stock }
-            : item
-        )
-      );
+      await inventoryAPI.update(productId, change);
+      // 재고현황 숫자만 부분 갱신 (API로)
+      await refreshAdminData();
     } catch (error) {
       console.error('재고 업데이트 오류:', error);
       alert(`재고 업데이트 중 오류가 발생했습니다: ${error.message}`);
@@ -194,10 +197,8 @@ function App() {
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
-      // API로 주문 상태 업데이트
       const updatedOrder = await ordersAPI.updateStatus(orderId, newStatus);
-      
-      // 주문 목록: 해당 주문만 상태 반영 (전체 새로고침 없음)
+      // 주문 목록: 해당 주문만 상태 반영
       setOrders(prev =>
         prev.map(order =>
           order.id === orderId || order.orderId === orderId
@@ -205,16 +206,8 @@ function App() {
             : order
         )
       );
-      
-      // 통계만 갱신 (전체 loadData 호출 안 함)
-      const statsData = await statsAPI.getDashboard();
-      setDashboardStats(statsData);
-      
-      // 제조완료인 경우 재고 수량만 추가로 갱신
-      if (newStatus === '제조완료') {
-        const inventoryData = await inventoryAPI.getAll();
-        setInventory(inventoryData);
-      }
+      // 전체현황·재고현황·주문현황 숫자만 부분 갱신 (API)
+      await refreshAdminData();
     } catch (error) {
       console.error('주문 상태 업데이트 오류:', error);
       alert(`주문 상태 변경 중 오류가 발생했습니다: ${error.message}`);

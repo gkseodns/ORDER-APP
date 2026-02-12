@@ -323,8 +323,8 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
-// 주문 상세 정보 조회 헬퍼 함수
-async function getOrderDetail(pool, orderId) {
+// 주문 상세 정보 조회 헬퍼 함수 (admin 부분 갱신 API에서도 사용)
+export async function getOrderDetail(pool, orderId) {
   try {
     // 주문 기본 정보
     const orderResult = await pool.request()

@@ -1,5 +1,5 @@
 // API 클라이언트 설정
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://order-app-backend-1c7a.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 // 공통 API 호출 함수
 async function apiCall(endpoint, options = {}) {
@@ -98,6 +98,14 @@ export const statsAPI = {
   // 대시보드 통계 조회
   getDashboard: async () => {
     const response = await apiCall('/stats/dashboard');
+    return response.data;
+  },
+};
+
+// 관리자 부분 갱신 API (전체현황 + 재고현황 + 주문현황만 한 번에)
+export const adminAPI = {
+  getPartial: async () => {
+    const response = await apiCall('/admin/partial');
     return response.data;
   },
 };

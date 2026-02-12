@@ -5,6 +5,7 @@ import menusRouter from './routes/menus.js';
 import ordersRouter from './routes/orders.js';
 import inventoryRouter from './routes/inventory.js';
 import statsRouter from './routes/stats.js';
+import adminRouter from './routes/admin.js';
 
 const app = express();
 const PORT = serverConfig.port;
@@ -39,6 +40,7 @@ app.use('/api/menus', menusRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/admin', adminRouter);
 
 // 404 핸들러
 app.use((req, res) => {
